@@ -3,209 +3,252 @@
 // Company: 
 // Engineer: 
 // 
-// Create Date:    15:55:21 12/25/2019 
+// Create Date: 2016/10/17 12:25:41
 // Design Name: 
-// Module Name:    Top 
+// Module Name: Top
 // Project Name: 
 // Target Devices: 
-// Tool versions: 
+// Tool Versions: 
 // Description: 
-//
+// 
 // Dependencies: 
-//
-// Revision: 
+// 
+// Revision:
 // Revision 0.01 - File Created
-// Additional Comments: 
-//
+// Additional Comments:
+// 
 //////////////////////////////////////////////////////////////////////////////////
+
+
 module Top(
 	input clk,
-	input rst,
-	input[15:0] SW,
-	output VS,
-	output HS,
-	output[3:0] R, G, B,
+	input rstn,
+	input [15:0]SW,
 	inout[4:0] BTN_X,
 	inout[3:0] BTN_Y,
-	output SEGLED_CLK,
-	output SEGLED_CLR,
-	output SEGLED_DO,
-	output SEGLED_PEN,
+	output hs,
+	output vs,
+	output [3:0] r,
+	output [3:0] g,
+	output [3:0] b,
 	input ps2_clk,
 	input ps2_data
     );
-	 
-	wire[31:0] clk_div;
-	clkdiv clk0(.clk(clk), .rst(1'b0), .clkdiv(clk_div));	//时钟分频器
 	
-	wire[15:0] SW_OK;
-	AntiJitter #(4) a0[15:0](.clk(clk_div[15]), .I(SW), .O(SW_OK));	//SW防抖
-	
-	wire[4:0] keyCode;
-	wire keyReady;
-	Keypad k0(.clk(clk_div[15]), .keyX(BTN_Y), .keyY(BTN_X), .keyCode(keyCode), .ready(keyReady));	//BTN矩阵模式防抖
-	
-	reg[11:0] vga_data;
-	wire[9:0] col_addr;
-	wire[8:0] row_addr;
-	vgac vga(.vga_clk(clk_div[1]), .clrn(SW_OK[0]), .d_in(vga_data), .row_addr(row_addr), .col_addr(col_addr), .r(R), .g(G), .b(B), .hs(HS), .vs(VS));	//VGA驱动
-
+	reg [31:0]clkdiv;
+	always@(posedge clk) begin
+		clkdiv <= clkdiv + 1'b1;
+	end
+	wire [15:0] SW_OK;
+AntiJitter #(4) a0[15:0](.clk(clkdiv[15]),.I(SW),.O(SW_OK));//防抖动
+	wire [31:0] segTestData;
+	wire [3:0]sout;
+ 	reg [11:0] vga_data;
+	wire [11:0] spob;
+	wire [11:0] spom1;
+	wire [11:0] spom2;
+	wire [11:0] spom3;
+	wire [11:0] spomr1;
+	wire [11:0] spomr2;
+	wire [11:0] spomgo;
+	wire [11:0] spomt1;
+	wire [11:0] spomt2;
+ 	wire [9:0] col_addr;
+ 	wire [8:0] row_addr;
+	vgac v0 (
+		.vga_clk(clkdiv[1]), .clrn(SW_OK[0]), .d_in(vga_data), .row_addr(row_addr), .col_addr(col_addr), .r(r), .g(g), .b(b), .hs(hs), .vs(vs)
+	);
 	wire[9:0] ps2_dataout;
 	wire ps2_ready;
 	PS2_keyboard ps2(.clk(clk), .rst(SW_OK[15]), .ps2_clk(ps2_clk), 
 							.ps2_data(ps2_data), .data_out(ps2_dataout), .ready(ps2_ready));
+	wire[4:0] keyCode;
+	wire keyReady;
+	Keypad k0(.clk(clkdiv[15]), .keyX(BTN_Y), .keyY(BTN_X), .keyCode(keyCode), .ready(keyReady));	//BTN矩阵模式防抖
+//定义变量地址，以及下x,y坐标
+	reg [18:0] bg1;
+	reg [18:0] mar;
+	reg [18:0] mr;
+	reg [18:0] go1;
+	reg [18:0] ttl;
+	reg [9:0] mario_x;
+	reg [8:0] mario_y;
+	reg loadmario1;
+	reg loadmario2;
+	reg loadmario3;
+	reg loadmushroom1;
+	reg loadturtle1;
+	//reg [18:0] mushroom1;
+	reg [9:0] mushroom_x;
+	reg [8:0] mushroom_y;
+	//reg [18:0] mushroom;
 	
-	reg[18:0] Dino0;	//恐 龙图像ip核地址
-	//wire[11:0] spob;	//恐龙图像ip核输出，4*3 rgb
-	reg[9:0] Dino0_X;	//恐龙位置X坐标（左上角）
-	initial Dino0_X <= 10'd30;
-	
-	reg[8:0] Dino0_Y;	//恐龙位置Y坐标（左上角）
-	initial Dino0_Y <= 9'd196;
-
-	//Dinosaur64 Dino(.addra(Dino0), .douta(spob), .clka(clk_div[1]));	//恐龙模型ip核
-	wire[11:0] spobDinoL;	//左腿抬起图像
-	DinoL DinoL(.addra(Dino0), .douta(spobDinoL), .clka(clk_div[1]));
-	wire[11:0] spobDinoR;	//右腿抬起图像
-	DinoR DinoR(.addra(Dino0), .douta(spobDinoR), .clka(clk_div[1]));
-	
-	wire[11:0] Obstacle_out;	//障碍物图像ip核输出，4*3 rgb
-	Obstacle_layer OLAYER(
-		.clk_div(clk_div), 
-		.col_addr(col_addr), 
-		.row_addr(row_addr + 8'd90), 
-		.dout(Obstacle_out)
-		);
-		
-	reg[18:0] Ground0;
-	reg[9:0] Ground0_X;
-	initial Ground0_X <= 10'd0;
-	
-	reg[8:0] Ground0_Y;
-	initial Ground0_Y <= 9'd260;
-	wire[11:0] spobGround;
-	ground Ground(.addra(Ground0),.douta(spobGround),.clka(clk_div[1]));
-	
-	reg crash;
-	initial crash = 1'b0;
-	collision_detection co0(.rst(1'b0), .dino(spobDonoL), .obstacle(Obstacle_out), .rdn(1'b0), .col_addr(col_addr), .row_addr(row_addr), .crash(crash0));
-			
-	wire [31:0] segData;
-	wire [3:0] sout;
-	ScoreCounter Score0(.rst(SW_OK[15]), .clk_div(clk_div), .data(segData), .crash(crash));
-	Seg7Device segDevice(.clkIO(clk_div[3]), .clkScan(clk_div[15:14]), .clkBlink(clk_div[25]),
-									.data(segData), .point(8'h0), .LES(8'h0),
-									.sout(sout));
-	assign SEGLED_CLK = sout[3];
-	assign SEGLED_DO = sout[2];
-	assign SEGLED_PEN = sout[1];
-	assign SEGLED_CLR = sout[0];
-	
+	//reg [9:0] mushroom2_x;
+	//reg [8:0] mushroom2_y;
+	//reg [18:0] turtle1;
+	reg [9:0] turtle_x;
+	reg [8:0] turtle_y;
+	//reg [9:0] turtle2_x;
+	//reg [8:0] turtle2_y;
+	//reg [18:0] turtle2;
+	reg cover;//定义是否为封面
+	reg overgame;
 	reg wasReady;
-	
-	reg isJump;	//是否改变恐龙的位置
+	reg ishit;
+	reg life=3;
+	reg isJump;
+   reg blood_x ;   reg blood_x1;   reg blood_x2;
+   reg blood_y;
 	reg[7:0] jumpTime;	//跳跃时间计数器
 	initial isJump <= 1'b0;
-	initial jumpTime <= 8'd128;
+	initial cover<=1;
+	initial overgame<=0;
+	initial mario_x=100;
+	initial mario_y=200;
+   initial mushroom_x=480;
+	initial mushroom_y=300;
+	initial life=3;
+	initial loadmario1=1;
+	initial loadmario2=0;
+	initial loadmario3=0;
+	initial loadmushroom1=1;
+	initial loadturtle1=1;
+	initial begin
+blood_x = 65;blood_x1 =85;blood_x2 =105;
+blood_y = 410;
+end
+	always @(posedge clk) begin
+	bg1<=(col_addr>=0&&col_addr<=639&&row_addr>=0&&row_addr<=479)?(480-row_addr)*640+col_addr:0;
+	mar<=(col_addr>=mario_x&&col_addr<=mario_x+49&&row_addr>=mario_y&&row_addr<=mario_y+99)?(100-(row_addr-mario_y))*50+(col_addr-mario_x):0;
+	go1<=(col_addr>=0&&col_addr<=639&&row_addr>=0&&row_addr<=479)?(480-row_addr)*640+col_addr:0;
+	mr<=(col_addr>=mushroom_x&&col_addr<=mushroom_x+59&&row_addr>=mushroom_y&&row_addr<=mushroom_y+59)?(60-(row_addr-mushroom_y))*60+(col_addr-mushroom_x):0;
+	ttl<=(col_addr>=turtle_x&&col_addr<=turtle_x+59&&row_addr>=turtle_y&&row_addr<=turtle_y+79)?(80-(row_addr-turtle_y))*60+(col_addr-turtle_y):0;
+	end
+	background b1(.addra(bg1),.douta(spob),.clka(clkdiv[1]));
+	mario1 m1(.addra(mar),.douta(spom1),.clka(clkdiv[1]));
+	mario2 m2(.addra(mar),.douta(spom2),.clka(clkdiv[1]));
+	mario3 m3(.addra(mar),.douta(spom3),.clka(clkdiv[1]));
+	mushroom1 m4(.addra(mr),.douta(spomr1),.clka(clkdiv[1]));
+	mushroom2 m5(.addra(mr),.douta(spomr2),.clka(clkdiv[1]));
+	gameover go(.addra(go1),.douta(spomgo),.clka(clkdiv[1]));
+	turtle1 t1(.addra(ttl),.douta(spomt1),.clka(clkdiv[1]));
+	turtle2 t2(.addra(ttl),.douta(spomt2),.clka(clkdiv[1]));
 	
-	reg isSquat;
-	reg[7:0] squatTime;
-	initial isJump <= 1'b0;
-	initial jumpTime <= 8'd128;
-	
-	reg DinoLeg;
-	initial DinoLeg <= 1'b0;
-
-	always@(posedge clk)begin
-		
-		if(SW_OK[15])begin
-			crash <= 1'b0;
+	always @(posedge clk) begin
+	if(col_addr>=0&&col_addr<=640&&row_addr>=0&&row_addr<=480&&!overgame) begin
+       vga_data <= spob[11:0];
+end
+    if(col_addr>=mario_x && col_addr<=mario_x+49&& row_addr>=mario_y && row_addr<=mario_y+99&&!overgame) begin
+	 if(loadmario1&&!loadmario2&&!loadmario3)begin
+			if(spom1[11:0]!=12'hfff)begin
+        vga_data <= spom1[11:0]; end
+		  end
+	 else if(!loadmario1&&loadmario2&&!loadmario3) begin
+		 if(spom2[11:0]!=12'hfff)begin
+        vga_data <= spom2[11:0]; end
+		  end
+	 else if(!loadmario1&&!loadmario2&&loadmario3)begin
+		 if(spom3[11:0]!=12'hfff)begin
+        vga_data <= spom3[11:0]; end
+		  end
+    end
+	 if (col_addr>=mushroom_x&&col_addr<=mushroom_x+59&&row_addr>=mushroom_y&&row_addr<=mushroom_y+59&&!overgame) begin
+		if(loadmushroom1&&spomr1[11:0]!=12'hfff)	begin	vga_data<=spomr1[11:0];end
+		else if(!loadmushroom1&&spomr2[11:0]!=12'hfff) begin vga_data<=spomr2[11:0];end
+	 end
+	if(overgame) begin
+		if(col_addr>=0&&col_addr<=639&&row_addr>=0&&row_addr<=479) begin
+		vga_data <= spomgo[11:0]; 
 		end
-	
-		wasReady <= keyReady;
+	end
+end
+always @(posedge clk) begin
 		if(!wasReady && keyReady)begin
 			case(keyCode)
 				5'h10: if(jumpTime >= 8'd64)begin isJump <= 1'b1; jumpTime <= 8'd0; end	//开始跳跃，将计数器置零
 				default:;
 			endcase
 		end
-		
 		if(ps2_dataout[7:0]==8'h12 && ps2_ready)//左shift
 			if(jumpTime >= 8'd64)begin isJump <= 1'b1; jumpTime <= 8'd0; end
-		if(ps2_dataout[7:0]==8'h29 && ps2_ready)//重新开始
-			begin crash <= 1'b0; end
-			
-		if(clk_div[23] && DinoLeg)begin
-			DinoLeg <= 1'b0;
-		end
-		else if(!clk_div[23] && !DinoLeg)begin
-			DinoLeg <= 1'b1;
-		end
-		
-		if(col_addr >= Dino0_X && col_addr <= Dino0_X + 63 && row_addr >= Dino0_Y && row_addr <= Dino0_Y + 63)begin //当扫描到恐龙应该出现的位置时
-			Dino0 <= (col_addr-Dino0_X)*64 + (row_addr-Dino0_Y);	//将需要读取的内存地址送入ip核
-			//if(Obstacle_out != 12'hfff)
-				//crash <= 1;
-			//else
-			//	crash[0] <= 0;
-			if(DinoLeg)
-				vga_data <= spobDinoL & Obstacle_out;	//输出传入VGA
-			else
-				vga_data <= spobDinoR & Obstacle_out;
-		end
-		else if(col_addr >= Ground0_X && col_addr <= Ground0_X + 640 && row_addr >= Ground0_Y && row_addr <= Ground0_Y + 200)begin
-			Ground0 <= (col_addr-Ground0_X)*640 + (row_addr-Ground0_Y);
-			if(1)begin
-				vga_data <= spobGround;
-			end
-		end
-		else begin
-			if(crash) begin 
-				vga_data <= Obstacle_out;
-			end
-			else begin
-				vga_data <= 12'hfff;
-			end
-		end
-		
-		
-		if(clk_div[19] && isJump && jumpTime < 8'd10)begin
-			Dino0_Y <= Dino0_Y - 10'd6;
+	
+	if(clkdiv[24]&&!overgame) begin
+	loadmario1=1;
+	loadmario2=0;
+	loadmario3=0;end
+	else if(!clkdiv[23]&&!clkdiv[24]&&!overgame) begin
+	loadmario1=0;
+	loadmario2=1;
+	loadmario3=0;
+	end
+	else if(!overgame) begin
+	loadmario1=0;
+	loadmario2=0;
+	loadmario3=1;
+	end
+	if(clkdiv[23]&&!overgame) begin
+		loadmushroom1=0;
+	end
+	else if(!clkdiv[23]&&!overgame) begin
+		loadmushroom1=1;
+	end
+	if(clkdiv[23]&&!overgame) begin
+		loadturtle1=1;
+	end
+	else if(!clkdiv[23]&&!overgame) begin
+		loadturtle1=0;
+	end
+	//注：上升/下降均采用分三段速度进行，模拟重力
+		//跳跃上升阶段开始
+		if(clkdiv[19] && isJump && jumpTime < 8'd10)begin
+			mario_y <= mario_y - 10'd6;
 			jumpTime <= jumpTime + 8'd1;
 			isJump <=0;
 		end
-		if(clk_div[19] && isJump && jumpTime >= 8'd10 && jumpTime < 8'd20)begin
-			Dino0_Y <= Dino0_Y - 10'd4;
+		if(clkdiv[19] && isJump && jumpTime >= 8'd10 && jumpTime < 8'd20)begin
+			mario_y <= mario_y - 10'd4;
 			jumpTime <= jumpTime + 8'd1;
 			isJump <=0;
 		end
-		if(clk_div[19] && isJump && jumpTime >= 8'd20 && jumpTime < 8'd32)begin
-			Dino0_Y <= Dino0_Y - 10'd2;
+		if(clkdiv[19] && isJump && jumpTime >= 8'd20 && jumpTime < 8'd32)begin
+			mario_y <= mario_y - 10'd2;
 			jumpTime <= jumpTime + 8'd1;
 			isJump <=0;
 		end
 		//跳跃上升阶段结束
-		else if(!clk_div[19] && !isJump && jumpTime < 8'd64) begin
+		else if(!clkdiv[19] && !isJump && jumpTime < 8'd64) begin
 			isJump <= 1;
 		end
 		//跳跃下降阶段开始
-		if(clk_div[19] && isJump && jumpTime >= 8'd32 && jumpTime < 8'd44)begin
-			Dino0_Y <= Dino0_Y + 10'd2;
+		if(clkdiv[19] && isJump && jumpTime >= 8'd32 && jumpTime < 8'd44)begin
+			mario_y <= mario_y + 10'd2;
 			jumpTime <= jumpTime + 8'd1;
 			isJump <= 0;
 		end
-		if(clk_div[19] && isJump && jumpTime >= 8'd44 && jumpTime < 8'd54)begin
-			Dino0_Y <= Dino0_Y + 10'd4;
+		if(clkdiv[19] && isJump && jumpTime >= 8'd44 && jumpTime < 8'd54)begin
+			mario_y <= mario_y + 10'd4;
 			jumpTime <= jumpTime + 8'd1;
 			isJump <= 0;
 		end
-		if(clk_div[19] && isJump && jumpTime >= 8'd54 && jumpTime < 8'd64)begin
-			Dino0_Y <= Dino0_Y + 10'd6;
+		if(clkdiv[19] && isJump && jumpTime >= 8'd54 && jumpTime < 8'd64)begin
+			mario_y <= mario_y + 10'd6;
 			jumpTime <= jumpTime + 8'd1;
 			isJump <=0;
 		end
 		//跳跃下降阶段结束
-		
-	end	
+end
+always @(*) begin
+	if(mario_x+50>=mushroom_x&&mario_x+50<=mushroom_x+60&&mario_y+100<=mushroom_y
+	||mario_x+50>=mushroom_x+60&&mario_x<=mushroom_x+60&&mario_y+100<=mushroom_y
+	) ishit=1;
+	//if(mario_x+25>=turtle_x&&mario_x+25<=turtle_x+30&&mario_y+50<=turtle_y
+	//||mario_x+25>=turtle_x+30&&mario_x<=turtle_x+30&&mario_y+50<=turtle_y
+	//) ishit=1;	
+	if(ishit) begin
+		//gameover=1;
+		life=life-1;
+		end
+	if (life==0) overgame=1;
 	
+end
 endmodule
